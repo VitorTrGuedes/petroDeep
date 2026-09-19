@@ -1,0 +1,67 @@
+# Dependências (em qualquer subpasta: backend, frontend, raiz)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Builds e saídas compiladas
+dist/
+build/
+.output/
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+
+# OS (Mac, Windows, Linux)
+.DS_Store
+Thumbs.db
+
+# Testes e cobertura
+coverage/
+.nyc_output/
+
+# IDEs e editores
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Variáveis de ambiente (Segurança: nunca commitar!)
+.env
+.env.*
+!.env.example
+
+# Diretórios e arquivos temporários (uploads/exports de Excel em teste)
+.temp/
+.tmp/
+temp/
+uploads/
+*.xlsx
+*.xls
+*.csv
+# (Descomente a linha abaixo se quiser versionar planilhas de teste no Git)
+# !tests/**/*.xlsx
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
