@@ -1,0 +1,358 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model audit_events {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String   @db.Uuid
+  entity_type String   @db.VarChar(100)
+  entity_id   String   @db.VarChar(100)
+  action      String   @db.VarChar(50)
+  before_json Json?
+  after_json  Json?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  users       users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model centralizer_placements {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tally_id          String            @db.Uuid
+  type_id           String            @db.Uuid
+  quantity          Int
+  top_depth_m       Float
+  base_depth_m      Float
+  density           String?           @db.VarChar(50)
+  tallies           tallies           @relation(fields: [tally_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  centralizer_types centralizer_types @relation(fields: [type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model centralizer_types {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String                   @unique @db.VarChar(100)
+  description            String?
+  centralizer_placements centralizer_placements[]
+}
+
+model connections {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  od_in             Float
+  weight_lb_ft      Float
+  thread            String              @db.VarChar(100)
+  mul_in            Float
+  optimal_torque    Float
+  operational_specs operational_specs[]
+}
+
+model elongation_calculations {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  service_id          String                @db.Uuid
+  calc_type           ElongationType
+  version             Int                   @default(1)
+  conditions          String?
+  status              String                @default("CALCULADO") @db.VarChar(50)
+  created_at          DateTime              @default(now()) @db.Timestamptz(6)
+  services            services              @relation(fields: [service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  elongation_sections elongation_sections[]
+}
+
+model elongation_results {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  section_id          String              @unique @db.Uuid
+  delta_normal_m      Float
+  delta_self_weight_m Float
+  delta_total_m       Float
+  cumulative_delta_m  Float
+  elongation_sections elongation_sections @relation(fields: [section_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model elongation_sections {
+  id                      String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  calculation_id          String                  @db.Uuid
+  order                   Int
+  measured_length_m       Float
+  vertical_length_m       Float
+  od_in                   Float
+  id_in                   Float
+  linear_weight           Float
+  steel_area_cm2          Float
+  top_force               Float?
+  base_force              Float?
+  elongation_results      elongation_results?
+  elongation_calculations elongation_calculations @relation(fields: [calculation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([calculation_id, order], map: "uq_section_order")
+}
+
+model materials {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sap_nm            String              @unique @db.VarChar(100)
+  description       String
+  od_in             Float
+  weight_lb_ft      Float
+  thread            String              @db.VarChar(100)
+  manufacturer      String?             @db.VarChar(150)
+  id_in             Float?
+  drift_in          Float?
+  is_tube           Boolean             @default(true)
+  operational_specs operational_specs[]
+}
+
+model metallurgies {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code              String              @unique @db.VarChar(50)
+  description       String
+  active            Boolean             @default(true)
+  operational_specs operational_specs[]
+}
+
+model operational_specs {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nm_pn          String           @unique @db.VarChar(100)
+  description    String
+  item_type      String           @db.VarChar(100)
+  material_id    String           @db.Uuid
+  metallurgy_id  String?          @db.Uuid
+  connection_id  String?          @db.Uuid
+  applied_torque Float
+  applied_mul_in Float
+  connections    connections?     @relation(fields: [connection_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  materials      materials        @relation(fields: [material_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  metallurgies   metallurgies?    @relation(fields: [metallurgy_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tube_instances tube_instances[]
+}
+
+model services {
+  id                         String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  well_id                    String                       @db.Uuid
+  created_by_id              String                       @db.Uuid
+  service_type               String                       @db.VarChar(100)
+  rig_name                   String                       @db.VarChar(100)
+  target_depth_m             Float?
+  status                     OperationsStatus             @default(PLANNING)
+  created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  elongation_calculations    elongation_calculations[]
+  users                      users                        @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  wells                      wells                        @relation(fields: [well_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  slip_crushing_calculations slip_crushing_calculations[]
+  stands                     stands[]
+  storage_locations          storage_locations[]
+  tallies                    tallies[]
+  tube_instances             tube_instances[]
+  xo_components              xo_components[]
+}
+
+model slip_crushing_calculations {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  service_id         String      @db.Uuid
+  wedge_spec_id      String      @db.Uuid
+  od_in              Float
+  id_in              Float
+  yield_strength_ksi Float
+  wall_use_factor    Float
+  friction_coeff     Float
+  safety_factor      Float
+  daf                Float
+  is_slip_proof      Boolean     @default(false)
+  k_factor           Float
+  adp_area           Float
+  uncrushed_cap      Float
+  crushed_cap        Float
+  status             String      @default("CALCULADO") @db.VarChar(50)
+  created_at         DateTime    @default(now()) @db.Timestamptz(6)
+  services           services    @relation(fields: [service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  wedge_specs        wedge_specs @relation(fields: [wedge_spec_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model stand_items {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  stand_id           String         @db.Uuid
+  tube_instance_id   String         @db.Uuid
+  sequence           Int
+  total_length_m     Float
+  make_up_loss_m     Float
+  effective_length_m Float
+  stands             stands         @relation(fields: [stand_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tube_instances     tube_instances @relation(fields: [tube_instance_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([stand_id, sequence], map: "uq_stand_sequence")
+}
+
+model stands {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  service_id     String        @db.Uuid
+  stand_number   Int
+  status         String        @default("PENDENTE") @db.VarChar(50)
+  approved_by_id String?       @db.Uuid
+  approved_at    DateTime?     @db.Timestamptz(6)
+  stand_items    stand_items[]
+  users          users?        @relation(fields: [approved_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  services       services      @relation(fields: [service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tally_items    tally_items[]
+
+  @@unique([service_id, stand_number], map: "uq_service_stand")
+}
+
+model storage_locations {
+  id                                                                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  service_id                                                        String              @db.Uuid
+  parent_id                                                         String?             @db.Uuid
+  name                                                              String              @db.VarChar(150)
+  deck_type                                                         String              @db.VarChar(100)
+  layer_number                                                      Int?
+  position                                                          String?             @db.VarChar(50)
+  capacity                                                          Int?
+  storage_locations                                                 storage_locations?  @relation("storage_locationsTostorage_locations", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_storage_locations                                           storage_locations[] @relation("storage_locationsTostorage_locations")
+  services                                                          services            @relation(fields: [service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tube_movements_tube_movements_from_location_idTostorage_locations tube_movements[]    @relation("tube_movements_from_location_idTostorage_locations")
+  tube_movements_tube_movements_to_location_idTostorage_locations   tube_movements[]    @relation("tube_movements_to_location_idTostorage_locations")
+}
+
+model tallies {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  service_id             String                   @db.Uuid
+  name                   String                   @db.VarChar(150)
+  version                Int                      @default(1)
+  status                 String                   @default("RASCUNHO") @db.VarChar(50)
+  final_depth_m          Float?
+  shoe_depth_m           Float?
+  rat_hole_m             Float?
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  centralizer_placements centralizer_placements[]
+  services               services                 @relation(fields: [service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tally_items            tally_items[]
+}
+
+model tally_items {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tally_id           String         @db.Uuid
+  tube_instance_id   String         @db.Uuid
+  stand_id           String?        @db.Uuid
+  sequence           Int
+  section_number     Int
+  section_position   Int
+  measured_length_m  Float
+  effective_length_m Float
+  cumulative_length  Float
+  top_depth_m        Float
+  base_depth_m       Float
+  cumulative_weight  Float?
+  cumulative_steel   Float?
+  observations       String?
+  stands             stands?        @relation(fields: [stand_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tallies            tallies        @relation(fields: [tally_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tube_instances     tube_instances @relation(fields: [tube_instance_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([tally_id, sequence], map: "uq_tally_sequence")
+}
+
+model tube_instances {
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  service_id          String            @db.Uuid
+  operational_spec_id String            @db.Uuid
+  physical_number     String            @db.VarChar(100)
+  measured_length_m   Float
+  damaged             Boolean           @default(false)
+  status              String            @default("RECEBIDO") @db.VarChar(50)
+  notes               String?
+  created_at          DateTime          @default(now()) @db.Timestamptz(6)
+  stand_items         stand_items[]
+  tally_items         tally_items[]
+  operational_specs   operational_specs @relation(fields: [operational_spec_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  services            services          @relation(fields: [service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tube_movements      tube_movements[]
+
+  @@unique([service_id, physical_number], map: "uq_service_tube")
+}
+
+model tube_movements {
+  id                                                                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tube_instance_id                                                     String             @db.Uuid
+  from_location_id                                                     String?            @db.Uuid
+  to_location_id                                                       String             @db.Uuid
+  movement_type                                                        String             @db.VarChar(100)
+  moved_at                                                             DateTime           @default(now()) @db.Timestamptz(6)
+  storage_locations_tube_movements_from_location_idTostorage_locations storage_locations? @relation("tube_movements_from_location_idTostorage_locations", fields: [from_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  storage_locations_tube_movements_to_location_idTostorage_locations   storage_locations  @relation("tube_movements_to_location_idTostorage_locations", fields: [to_location_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tube_instances                                                       tube_instances     @relation(fields: [tube_instance_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model users {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String         @db.VarChar(255)
+  email              String         @unique @db.VarChar(255)
+  password_hash      String         @db.VarChar(255)
+  role               Role           @default(OPERATOR)
+  active             Boolean        @default(true)
+  reset_token        String?        @db.VarChar(255)
+  reset_token_expiry DateTime?      @db.Timestamptz(6)
+  created_at         DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime       @default(now()) @db.Timestamptz(6)
+  audit_events       audit_events[]
+  services           services[]
+  stands             stands[]
+}
+
+model wedge_specs {
+  id                         String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                       String                       @unique @db.VarChar(100)
+  length_in                  Float
+  angle_deg                  Float
+  contact_efficiency         Float
+  is_allowed                 Boolean                      @default(true)
+  slip_crushing_calculations slip_crushing_calculations[]
+}
+
+model wells {
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String     @unique @db.VarChar(150)
+  water_depth_m Float?
+  final_depth_m Float?
+  created_at    DateTime   @default(now()) @db.Timestamptz(6)
+  services      services[]
+}
+
+model xo_components {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  service_id       String   @db.Uuid
+  nm_pn            String   @db.VarChar(100)
+  inscription      String?  @db.VarChar(100)
+  total_length_m   Float
+  mul_in           Float
+  effective_length Float
+  od_in            Float
+  weight_lb_ft     Float
+  torque_lower     Float?
+  description      String
+  section_type     String?  @db.VarChar(100)
+  services         services @relation(fields: [service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+enum ElongationType {
+  HIGH_HANGER
+  CASING
+  SETTING_STRING
+  DRILLING_STRING
+}
+
+enum OperationsStatus {
+  PLANNING
+  ACTIVE
+  SUSPEND
+  COMPLETED
+  ARCHIVED
+}
+
+enum Role {
+  ADMIN
+  SUPERVISOR
+  OPERATOR
+  DRILLER
+  VIEWER
+}
